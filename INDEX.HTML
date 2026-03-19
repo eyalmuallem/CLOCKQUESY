@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Timegrapher">
+<title>⌚ Timegrapher</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #1a1d27;
+  --bg3: #22263a;
+  --border: rgba(255,255,255,0.1);
+  --border2: rgba(255,255,255,0.18);
+  --text: #e8eaf0;
+  --text2: #8b90a8;
+  --text3: #555a72;
+  --green: #4caf50;
+  --orange: #ff9800;
+  --red: #e53935;
+  --blue: #4fc3f7;
+  --radius: 10px;
+  --mono: 'Courier New', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.app { max-width: 500px; margin: 0 auto; padding: 14px 12px 30px; }
+
+.header { text-align: center; margin-bottom: 16px; padding-top: 8px; }
+.header h1 { font-size: 19px; font-weight: 500; letter-spacing: 0.12em; color: var(--text); }
+.header p { font-size: 10px; color: var(--text3); margin-top: 4px; }
+
+/* Search */
+.search-section {
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px; margin-bottom: 12px;
+}
+.search-label { font-size: 10px; color: var(--text3); margin-bottom: 7px; letter-spacing: 0.08em; }
+.search-row { display: flex; gap: 7px; }
+.search-input {
+  flex: 1; padding: 9px 11px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text);
+  font-family: var(--mono); font-size: 13px;
+  outline: none;
+}
+.search-input:focus { border-color: var(--blue); }
+.search-btn {
+  padding: 9px 13px; border-radius: 8px;
+  border: 0.5px solid var(--border2);
+  background: transparent; color: var(--text);
+  font-family: var(--mono); font-size: 13px;
+  cursor: pointer; white-space: nowrap;
+}
+.search-btn:active { background: var(--bg3); }
+
+.suggestions {
+  margin-top: 5px;
+  border: 0.5px solid var(--border2);
+  border-radius: 8px; background: var(--bg3);
+  display: none; max-height: 180px; overflow-y: auto;
+}
+.suggestions.show { display: block; }
+.suggestion-item {
+  padding: 8px 11px; cursor: pointer; font-size: 12px;
+  border-bottom: 0.5px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:active { background: var(--bg2); }
+.suggestion-bph { color: var(--text3); font-size: 10px; }
+
+.watch-result {
+  margin-top: 8px; padding: 9px 11px;
+  border-radius: 8px; border: 0.5px solid var(--border);
+  background: var(--bg); display: none;
+}
+.watch-result.show { display: block; }
+.result-name { font-size: 12px; font-weight: 500; margin-bottom: 5px; }
+.result-specs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.result-spec { font-size: 10px; color: var(--text2); }
+.result-spec span { color: var(--text); }
+.result-status { font-size: 10px; }
+.result-status.found { color: var(--green); }
+.result-status.notfound { color: var(--orange); }
+
+/* Status */
+.status-bar {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 8px 12px; margin-bottom: 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius); background: var(--bg2);
+  font-size: 11px; color: var(--text2);
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #555; transition: background 0.3s; flex-shrink: 0; }
+.status-dot.listening { background: var(--green); animation: pulse 1.2s infinite; }
+.status-dot.analyzing { background: var(--orange); animation: pulse 0.6s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+/* BPH */
+.bph-selector {
+  display: flex; gap: 6px; margin-bottom: 12px;
+  align-items: center; flex-wrap: wrap;
+}
+.bph-label { font-size: 10px; color: var(--text3); }
+.bph-btn {
+  padding: 5px 11px; font-size: 11px; border-radius: 20px;
+  border: 0.5px solid var(--border);
+  background: transparent; color: var(--text2);
+  cursor: pointer; font-family: var(--mono); transition: all 0.15s;
+}
+.bph-btn.active { background: var(--text); color: var(--bg); border-color: transparent; }
+.bph-btn.auto-set { border-color: var(--green); color: var(--green); }
+
+/* Metrics */
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.metric-card {
+  background: var(--bg2); border: 0.5px solid var(--border);
+  border-radius: var(--radius); padding: 10px 6px; text-align: center;
+}
+.metric-label { font-size: 9px; color: var(--text3); letter-spacing: 0.08em; margin-bottom: 4px; }
+.metric-value { font-size: 22px; font-weight: 500; line-height: 1; color: var(--text); }
+.metric-unit { font-size: 9px; color: var(--text2); margin-top: 3px; }
+.metric-value.good { color: var(--green); }
+.metric-value.warn { color: var(--orange); }
+.metric-value.bad  { color: var(--red); }
+
+/* Graphs */
+.graph-section {
+  background: var(--bg2); border: 0.5px solid var(--border);
+  border-radius: var(--radius); padding: 9px; margin-bottom: 10px;
+}
+.graph-title { font-size: 10px; color: var(--text3); margin-bottom: 7px; text-align: center; letter-spacing: 0.06em; }
+canvas { display: block; width: 100%; border-radius: 4px; }
+#timegrapherCanvas { background: #070d1a; height: 110px; }
+#waveCanvas { background: #070d1a; height: 52px; }
+
+/* Controls */
+.controls { display: flex; gap: 8px; margin-bottom: 12px; }
+.btn {
+  flex: 1; padding: 11px; border-radius: var(--radius);
+  border: 0.5px solid var(--border2);
+  background: transparent; color: var(--text);
+  font-size: 13px; font-family: var(--mono); cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: transparent; }
+.btn.primary:active { opacity: 0.82; }
+.btn.stop { border-color: rgba(229,57,53,0.5); color: var(--red); }
+
+/* Log */
+.log-section { border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.log-header { padding: 7px 12px; font-size: 10px; color: var(--text3); background: var(--bg2); border-bottom: 0.5px solid var(--border); letter-spacing: 0.06em; }
+.log-body { max-height: 120px; overflow-y: auto; background: var(--bg); }
+.log-entry {
+  font-size: 10px; color: var(--text2); padding: 5px 12px;
+  border-bottom: 0.5px solid var(--border);
+  display: flex; gap: 10px; align-items: center;
+}
+.log-entry:last-child { border-bottom: none; }
+.log-time { color: var(--text3); min-width: 50px; }
+.log-good { color: var(--green); }
+.log-warn { color: var(--orange); }
+.log-bad  { color: var(--red); }
+
+/* PWA install hint */
+.install-hint {
+  margin-top: 16px; padding: 9px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius); background: var(--bg2);
+  font-size: 10px; color: var(--text3); text-align: center; line-height: 1.7;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>⌚ TIMEGRAPHER</h1>
+    <p>ניתוח שעון אוטומטי | זיהוי דגם אוטומטי</p>
+  </div>
+
+  <div class="search-section">
+    <div class="search-label">דגם / תנועה / קלבר</div>
+    <div class="search-row">
+      <input class="search-input" id="watchInput" type="text"
+        placeholder="NH35, ETA 2824, Rolex 3135..."
+        oninput="onSearchInput(this.value)"
+        onkeydown="if(event.key==='Enter'){searchWatch();this.blur()}">
+      <button class="search-btn" onclick="searchWatch()">🔍</button>
+    </div>
+    <div class="suggestions" id="suggestions"></div>
+    <div class="watch-result" id="watchResult">
+      <div class="result-name" id="resultName"></div>
+      <div class="result-specs" id="resultSpecs"></div>
+      <div class="result-status" id="resultStatus"></div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">בחר דגם שעון או BPH ידנית</span>
+  </div>
+
+  <div class="bph-selector">
+    <span class="bph-label">BPH:</span>
+    <button class="bph-btn" data-bph="18000" onclick="setBPH(18000,this)">18000</button>
+    <button class="bph-btn active" data-bph="21600" onclick="setBPH(21600,this)">21600</button>
+    <button class="bph-btn" data-bph="28800" onclick="setBPH(28800,this)">28800</button>
+    <button class="bph-btn" data-bph="36000" onclick="setBPH(36000,this)">36000</button>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">BPH נמדד</div>
+      <div class="metric-value" id="mBPH">—</div>
+      <div class="metric-unit">פעימות/שעה</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">סטייה</div>
+      <div class="metric-value" id="mRate">—</div>
+      <div class="metric-unit">שניות/יום</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">BEAT ERR</div>
+      <div class="metric-value" id="mBeat">—</div>
+      <div class="metric-unit">ms</div>
+    </div>
+  </div>
+
+  <div class="graph-section">
+    <div class="graph-title">TIMEGRAPHER — סטייה לאורך זמן</div>
+    <canvas id="timegrapherCanvas"></canvas>
+  </div>
+
+  <div class="graph-section">
+    <div class="graph-title">אות מיקרופון</div>
+    <canvas id="waveCanvas"></canvas>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="startBtn" onclick="toggleRecording()">▶ התחל ניתוח</button>
+    <button class="btn" onclick="resetAll()">↺ אפס</button>
+  </div>
+
+  <div class="log-section">
+    <div class="log-header">יומן מדידות</div>
+    <div class="log-body" id="logBody">
+      <div class="log-entry" style="color:var(--text3)">ממתין לנתונים...</div>
+    </div>
+  </div>
+
+  <div class="install-hint" id="installHint">
+    💡 iPhone: לחץ ⬆ ← "Add to Home Screen" להתקנה כאפליקציה<br>
+    Android: לחץ ⋮ ← "Add to Home screen"
+  </div>
+</div>
+
+<script>
+const WATCH_DB = [
+  { name:"Seiko NH35 / NH36", brand:"Seiko", keywords:["nh35","nh36","seiko nh"], bph:21600, amplitude:[250,310], beatErr:0.5, tolerance:10 },
+  { name:"Seiko NH38 / NH39", brand:"Seiko", keywords:["nh38","nh39"], bph:21600, amplitude:[250,310], beatErr:0.5, tolerance:10 },
+  { name:"Seiko 7S26 / 7S36", brand:"Seiko", keywords:["7s26","7s36","7s"], bph:21600, amplitude:[230,290], beatErr:1.0, tolerance:15 },
+  { name:"Seiko 6R15 / 6R24 / 6R27", brand:"Seiko", keywords:["6r15","6r24","6r27","6r"], bph:21600, amplitude:[270,320], beatErr:0.5, tolerance:10 },
+  { name:"Seiko 9SA5 (Spring Drive)", brand:"Seiko", keywords:["9sa5","spring drive","9s"], bph:28800, amplitude:[270,330], beatErr:0.0, tolerance:1 },
+  { name:"Grand Seiko 8L55", brand:"Grand Seiko", keywords:["8l55","grand seiko","gs9"], bph:36000, amplitude:[280,340], beatErr:0.2, tolerance:5 },
+  { name:"ETA 2824-2", brand:"ETA", keywords:["eta 2824","2824","2824-2"], bph:28800, amplitude:[270,310], beatErr:0.3, tolerance:7 },
+  { name:"ETA 2836-2", brand:"ETA", keywords:["eta 2836","2836","2836-2"], bph:28800, amplitude:[270,310], beatErr:0.3, tolerance:7 },
+  { name:"ETA 2892-A2", brand:"ETA", keywords:["eta 2892","2892","2892-a2"], bph:28800, amplitude:[280,320], beatErr:0.3, tolerance:5 },
+  { name:"ETA 7750", brand:"ETA", keywords:["eta 7750","7750"], bph:28800, amplitude:[280,310], beatErr:0.3, tolerance:7 },
+  { name:"ETA 6497 / 6498", brand:"ETA", keywords:["eta 6497","eta 6498","6497","6498","unitas"], bph:18000, amplitude:[250,300], beatErr:0.5, tolerance:10 },
+  { name:"Miyota 9015", brand:"Miyota", keywords:["miyota 9015","9015","9035"], bph:28800, amplitude:[260,310], beatErr:0.5, tolerance:10 },
+  { name:"Miyota 8215 / 8205", brand:"Miyota", keywords:["miyota 8215","miyota 8205","8215","8205"], bph:21600, amplitude:[240,290], beatErr:1.0, tolerance:15 },
+  { name:"Miyota 821A", brand:"Miyota", keywords:["miyota 821a","821a"], bph:21600, amplitude:[240,280], beatErr:0.8, tolerance:12 },
+  { name:"Rolex Cal. 3135", brand:"Rolex", keywords:["rolex 3135","3135","datejust","day-date"], bph:28800, amplitude:[290,330], beatErr:0.1, tolerance:4 },
+  { name:"Rolex Cal. 3235", brand:"Rolex", keywords:["rolex 3235","3235","datejust 41"], bph:28800, amplitude:[290,330], beatErr:0.1, tolerance:4 },
+  { name:"Rolex Cal. 4130", brand:"Rolex", keywords:["rolex 4130","4130","daytona"], bph:28800, amplitude:[290,330], beatErr:0.1, tolerance:4 },
+  { name:"Rolex Cal. 3186 (GMT)", brand:"Rolex", keywords:["rolex 3186","3186","gmt-master"], bph:28800, amplitude:[285,325], beatErr:0.1, tolerance:4 },
+  { name:"Omega Cal. 8500 / 8501", brand:"Omega", keywords:["omega 8500","8500","8501","co-axial master"], bph:25200, amplitude:[290,320], beatErr:0.1, tolerance:4 },
+  { name:"Omega Cal. 8900", brand:"Omega", keywords:["omega 8900","8900","8901","seamaster 300m"], bph:25200, amplitude:[290,320], beatErr:0.1, tolerance:4 },
+  { name:"Omega Cal. 1861 / 1863", brand:"Omega", keywords:["omega 1861","1861","1863","speedmaster moonwatch"], bph:21600, amplitude:[265,300], beatErr:0.5, tolerance:5 },
+  { name:"Tudor MT5602", brand:"Tudor", keywords:["tudor mt5602","mt5602","mt5612","tudor black bay"], bph:28800, amplitude:[280,320], beatErr:0.2, tolerance:4 },
+  { name:"AP Cal. 3120", brand:"Audemars Piguet", keywords:["ap 3120","3120","royal oak","audemars"], bph:21600, amplitude:[295,330], beatErr:0.2, tolerance:4 },
+  { name:"Patek Cal. 324", brand:"Patek Philippe", keywords:["patek 324","calatrava","patek philippe"], bph:28800, amplitude:[290,325], beatErr:0.1, tolerance:3 },
+  { name:"IWC Cal. 82100", brand:"IWC", keywords:["iwc 82100","82100","spitfire iwc"], bph:28800, amplitude:[280,315], beatErr:0.2, tolerance:5 },
+  { name:"IWC Cal. 80110", brand:"IWC", keywords:["iwc 80110","80110","portugieser"], bph:18000, amplitude:[270,310], beatErr:0.3, tolerance:6 },
+  { name:"Longines Cal. L888", brand:"Longines", keywords:["longines l888","l888","longines master"], bph:25200, amplitude:[270,310], beatErr:0.3, tolerance:4 },
+  { name:"Tissot Powermatic 80", brand:"Tissot", keywords:["tissot pm80","powermatic 80","pm80"], bph:21600, amplitude:[255,295], beatErr:0.5, tolerance:10 },
+  { name:"Orient F6922", brand:"Orient", keywords:["orient f69","orient f67","f6922","orient bambino","orient mako"], bph:21600, amplitude:[240,290], beatErr:0.8, tolerance:15 },
+  { name:"Valjoux / ETA 7753", brand:"Valjoux", keywords:["valjoux 7753","7753"], bph:28800, amplitude:[270,310], beatErr:0.5, tolerance:8 },
+];
+
+let targetBPH = 21600, currentWatch = null;
+let isRecording = false;
+let audioCtx, analyser, source, stream, scriptProcessor;
+let lastTickTime = null, intervals = [], beatPairs = [], timegrapherPoints = [], logEntries = [];
+let waveData = new Uint8Array(512), animFrame = null;
+const tgCtx = document.getElementById('timegrapherCanvas').getContext('2d');
+const wvCtx = document.getElementById('waveCanvas').getContext('2d');
+
+function onSearchInput(val) {
+  if (val.length < 2) { hideSuggestions(); return; }
+  const results = searchDB(val).slice(0, 7);
+  if (!results.length) { hideSuggestions(); return; }
+  const el = document.getElementById('suggestions');
+  el.innerHTML = results.map(w =>
+    `<div class="suggestion-item" onclick="selectWatch(${WATCH_DB.indexOf(w)})">
+      <span>${w.name}</span>
+      <span class="suggestion-bph">${w.bph ? w.bph+' BPH' : 'קוורץ'}</span>
+    </div>`).join('');
+  el.classList.add('show');
+}
+
+function searchDB(query) {
+  const q = query.toLowerCase().trim();
+  return WATCH_DB.filter(w => w.keywords.some(k => k.includes(q)) || w.name.toLowerCase().includes(q) || w.brand.toLowerCase().includes(q));
+}
+function hideSuggestions() { document.getElementById('suggestions').classList.remove('show'); }
+
+function searchWatch() {
+  hideSuggestions();
+  const val = document.getElementById('watchInput').value;
+  const results = searchDB(val);
+  if (results.length) selectWatch(WATCH_DB.indexOf(results[0]));
+  else showNotFound(val);
+}
+
+function selectWatch(idx) {
+  hideSuggestions();
+  const w = WATCH_DB[idx];
+  currentWatch = w;
+  document.getElementById('watchInput').value = w.name;
+  const result = document.getElementById('watchResult');
+  document.getElementById('resultName').textContent = w.name;
+  document.getElementById('resultSpecs').innerHTML =
+    `<span class="result-spec">BPH: <span>${w.bph}</span></span>
+     <span class="result-spec">אמפליטודה: <span>${w.amplitude[0]}–${w.amplitude[1]}°</span></span>
+     <span class="result-spec">Beat Error מקס׳: <span>${w.beatErr}ms</span></span>
+     <span class="result-spec">סטייה מותרת: <span>±${w.tolerance}s/d</span></span>`;
+  document.getElementById('resultStatus').textContent = '✓ BPH הוגדר אוטומטית ל-' + w.bph;
+  document.getElementById('resultStatus').className = 'result-status found';
+  result.classList.add('show');
+  setBPH(w.bph, null, true);
+  setStatus('דגם: ' + w.name + ' | BPH: ' + w.bph, '');
+}
+
+function showNotFound(val) {
+  const result = document.getElementById('watchResult');
+  document.getElementById('resultName').textContent = val || 'דגם לא ידוע';
+  document.getElementById('resultSpecs').innerHTML = '';
+  document.getElementById('resultStatus').textContent = '⚠ לא נמצא — בחר BPH ידנית';
+  document.getElementById('resultStatus').className = 'result-status notfound';
+  result.classList.add('show');
+}
+
+function setBPH(v, btn, autoSet) {
+  targetBPH = v;
+  document.querySelectorAll('.bph-btn').forEach(b => {
+    b.classList.remove('active', 'auto-set');
+    if (parseInt(b.dataset.bph) === v) b.classList.add(autoSet ? 'auto-set' : 'active');
+  });
+  if (btn && !autoSet) { btn.classList.add('active'); currentWatch = null; }
+}
+
+document.addEventListener('click', e => { if (!e.target.closest('.search-section')) hideSuggestions(); });
+
+async function toggleRecording() {
+  if (isRecording) stopRecording(); else await startRecording();
+}
+
+async function startRecording() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.1;
+    source = audioCtx.createMediaStreamSource(stream);
+    const hp = audioCtx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1000;
+    const lp = audioCtx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 9000;
+    source.connect(hp); hp.connect(lp); lp.connect(analyser);
+    isRecording = true;
+    lastTickTime = null; intervals = []; beatPairs = []; timegrapherPoints = []; logEntries = [];
+    document.getElementById('startBtn').textContent = '⏹ עצור';
+    document.getElementById('startBtn').className = 'btn stop';
+    document.getElementById('installHint').style.display = 'none';
+    setStatus('מאזין לשעון...', 'listening');
+    processAudio();
+    animFrame = requestAnimationFrame(drawLoop);
+  } catch(e) {
+    setStatus('שגיאה: אפשר גישה למיקרופון', '');
+    alert('נדרש אישור מיקרופון. אנא אפשר גישה ונסה שוב.');
+  }
+}
+
+function stopRecording() {
+  isRecording = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
+  if (animFrame) cancelAnimationFrame(animFrame);
+  if (scriptProcessor) try { scriptProcessor.disconnect(); } catch(e) {}
+  document.getElementById('startBtn').textContent = '▶ התחל ניתוח';
+  document.getElementById('startBtn').className = 'btn primary';
+  setStatus('ניתוח הסתיים — ' + intervals.length + ' פעימות נמדדו', '');
+}
+
+function resetAll() {
+  if (isRecording) stopRecording();
+  intervals = []; beatPairs = []; timegrapherPoints = []; logEntries = []; lastTickTime = null;
+  ['mBPH','mRate','mBeat'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+    document.getElementById(id).className = 'metric-value';
+  });
+  document.getElementById('logBody').innerHTML = '<div class="log-entry" style="color:var(--text3)">ממתין לנתונים...</div>';
+  setStatus('בחר דגם שעון או BPH ידנית', '');
+  clearCanvases();
+}
+
+function processAudio() {
+  scriptProcessor = audioCtx.createScriptProcessor(1024, 1, 1);
+  analyser.connect(scriptProcessor);
+  scriptProcessor.connect(audioCtx.destination);
+  let threshold = 0, inTick = false, lastPeak = 0;
+  const minInterval = (3600 / targetBPH) * 0.7 * 1000;
+  scriptProcessor.onaudioprocess = e => {
+    if (!isRecording) return;
+    const data = e.inputBuffer.getChannelData(0);
+    analyser.getByteTimeDomainData(waveData);
+    let energy = 0;
+    for (let i = 0; i < data.length; i++) energy += data[i] * data[i];
+    energy = Math.sqrt(energy / data.length);
+    threshold = threshold * 0.98 + energy * 0.02;
+    const dyn = Math.max(threshold * 3.8, 0.004);
+    if (energy > dyn && !inTick) {
+      const now = audioCtx.currentTime * 1000;
+      if (now - lastPeak > minInterval) { inTick = true; lastPeak = now; onTick(now); }
+    } else if (energy < dyn * 0.4) inTick = false;
+  };
+}
+
+function onTick(time) {
+  if (lastTickTime !== null) {
+    const iv = time - lastTickTime;
+    const exp = 3600000 / targetBPH;
+    if (iv > exp * 0.6 && iv < exp * 1.4) {
+      intervals.push(iv); beatPairs.push({ time, iv });
+      if (intervals.length >= 4) analyzeAndUpdate();
+    }
+  }
+  lastTickTime = time;
+}
+
+function analyzeAndUpdate() {
+  const recent = intervals.slice(-60);
+  const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const measuredBPH = Math.round(3600000 / avg);
+  const deviationSec = ((avg - 3600000 / targetBPH) / (3600000 / targetBPH)) * 86400;
+  let beatError = 0;
+  if (beatPairs.length >= 4) {
+    const pairs = beatPairs.slice(-20);
+    const diffs = [];
+    for (let i = 1; i < pairs.length; i += 2) diffs.push(Math.abs(pairs[i].iv - pairs[i-1].iv));
+    if (diffs.length) beatError = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+  }
+  const rate = deviationSec.toFixed(1);
+  const absRate = Math.abs(parseFloat(rate));
+  const tolRate = currentWatch ? currentWatch.tolerance : 15;
+  const rateClass = absRate <= tolRate/2 ? 'good' : absRate <= tolRate ? 'warn' : 'bad';
+  const maxBE = currentWatch ? currentWatch.beatErr * 2 : 2;
+  const beClass = beatError < (currentWatch ? currentWatch.beatErr : 1) ? 'good' : beatError < maxBE ? 'warn' : 'bad';
+
+  document.getElementById('mBPH').textContent = measuredBPH;
+  document.getElementById('mRate').textContent = (parseFloat(rate) >= 0 ? '+' : '') + rate;
+  document.getElementById('mRate').className = 'metric-value ' + rateClass;
+  document.getElementById('mBeat').textContent = beatError.toFixed(1);
+  document.getElementById('mBeat').className = 'metric-value ' + beClass;
+
+  timegrapherPoints.push(parseFloat(rate));
+  if (timegrapherPoints.length > 80) timegrapherPoints.shift();
+  drawTimegrapher();
+  setStatus('מנתח... ' + intervals.length + ' פעימות' + (currentWatch ? ' | ' + currentWatch.name : ''), 'analyzing');
+  if (intervals.length % 15 === 0) addLog(measuredBPH, rate, rateClass, beatError, beClass);
+}
+
+function addLog(bph, rate, rateClass, be, beClass) {
+  const now = new Date();
+  const t = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => n.toString().padStart(2,'0')).join(':');
+  const sign = parseFloat(rate) >= 0 ? '+' : '';
+  logEntries.unshift({ t, bph, rate: sign+rate, rateClass, be: be.toFixed(1), beClass });
+  if (logEntries.length > 30) logEntries.pop();
+  document.getElementById('logBody').innerHTML = logEntries.map(e =>
+    `<div class="log-entry">
+      <span class="log-time">${e.t}</span>
+      <span class="log-${e.rateClass}">${e.bph} BPH</span>
+      <span class="log-${e.rateClass}">${e.rate}s/d</span>
+      <span class="log-${e.beClass}">BE:${e.be}ms</span>
+    </div>`).join('');
+}
+
+function setStatus(text, state) {
+  document.getElementById('statusText').textContent = text;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (state ? ' ' + state : '');
+}
+
+function drawTimegrapher() {
+  const c = document.getElementById('timegrapherCanvas');
+  const w = c.offsetWidth || 440, h = 110;
+  c.width = w; c.height = h;
+  tgCtx.fillStyle = '#070d1a'; tgCtx.fillRect(0, 0, w, h);
+  tgCtx.strokeStyle = '#1a2a44'; tgCtx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = (h/4)*i; tgCtx.beginPath(); tgCtx.moveTo(0,y); tgCtx.lineTo(w,y); tgCtx.stroke();
+  }
+  if (currentWatch) {
+    const maxDev = 35;
+    const zoneH = (currentWatch.tolerance / maxDev) * (h/2);
+    tgCtx.fillStyle = 'rgba(76,175,80,0.1)';
+    tgCtx.fillRect(0, h/2 - zoneH, w, zoneH * 2);
+  }
+  tgCtx.strokeStyle = 'rgba(255,99,48,0.35)'; tgCtx.lineWidth = 0.5;
+  tgCtx.setLineDash([4,4]);
+  tgCtx.beginPath(); tgCtx.moveTo(0, h/2); tgCtx.lineTo(w, h/2); tgCtx.stroke();
+  tgCtx.setLineDash([]);
+  tgCtx.fillStyle = 'rgba(79,195,247,0.6)'; tgCtx.font = '8px monospace';
+  tgCtx.fillText('+30', 3, 12); tgCtx.fillText('0', 3, h/2+4); tgCtx.fillText('-30', 3, h-3);
+  if (timegrapherPoints.length < 2) return;
+  const maxDev = 35, xStep = w / 80;
+  tgCtx.strokeStyle = '#4fc3f7'; tgCtx.lineWidth = 1.2; tgCtx.beginPath();
+  timegrapherPoints.forEach((pt, i) => {
+    const x = i * xStep + (w - timegrapherPoints.length * xStep);
+    const y = h/2 - (pt/maxDev) * (h/2 - 10);
+    i === 0 ? tgCtx.moveTo(x, y) : tgCtx.lineTo(x, y);
+  });
+  tgCtx.stroke();
+  const last = timegrapherPoints[timegrapherPoints.length - 1];
+  const lx = (timegrapherPoints.length-1)*xStep + (w - timegrapherPoints.length*xStep);
+  const ly = h/2 - (last/maxDev)*(h/2-10);
+  tgCtx.fillStyle = '#4fc3f7'; tgCtx.beginPath(); tgCtx.arc(lx, ly, 3, 0, Math.PI*2); tgCtx.fill();
+}
+
+function drawLoop() {
+  if (!isRecording) return;
+  const wc = document.getElementById('waveCanvas');
+  const w = wc.offsetWidth || 440, h = 52;
+  wc.width = w; wc.height = h;
+  wvCtx.fillStyle = '#070d1a'; wvCtx.fillRect(0, 0, w, h);
+  if (analyser) analyser.getByteTimeDomainData(waveData);
+  wvCtx.strokeStyle = 'rgba(79,195,247,0.7)'; wvCtx.lineWidth = 1; wvCtx.beginPath();
+  const sw = w / waveData.length;
+  waveData.forEach((v, i) => {
+    const x = i*sw, y = (v/128)*h/2;
+    i === 0 ? wvCtx.moveTo(x,y) : wvCtx.lineTo(x,y);
+  });
+  wvCtx.stroke();
+  animFrame = requestAnimationFrame(drawLoop);
+}
+
+function clearCanvases() {
+  ['timegrapherCanvas','waveCanvas'].forEach(id => {
+    const c = document.getElementById(id);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#070d1a'; ctx.fillRect(0, 0, c.width||440, c.height||110);
+  });
+}
+clearCanvases();
+</script>
+</body>
+</html>
